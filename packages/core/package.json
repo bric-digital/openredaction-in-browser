@@ -1,5 +1,5 @@
 {
-  "name": "openredaction",
+  "name": "openredaction-browser",
   "version": "1.0.6",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
