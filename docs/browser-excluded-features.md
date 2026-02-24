@@ -53,12 +53,45 @@ These methods throw clear browser-only errors (or return empty/null where docume
   `getPatternStats` returns `null`
   `getPriorityOptimizer` returns `undefined`
 
+### Additional class-surface drift vs Node `OpenRedaction`
+
+These are present on the Node class but not implemented on the browser class:
+
+- `getAuditLogger`, `getMetricsCollector`, `getRBACManager`
+Reason: dependency removal (audit/metrics/RBAC modules are not exported in browser entry) and environment scope reduction for browser-only runtime.
+- `explain`, `generateReport`
+Reason: dependency removal (explain/report modules intentionally excluded from browser entry to keep browser surface and transitive imports Node-safe).
+- `healthCheck`, `quickHealthCheck`
+Reason: environment constraint (server/runtime health workflows are Node-oriented and excluded from browser build).
+
+### Signature-level compatibility differences
+
+These methods exist in both classes but browser signatures are intentionally narrower:
+
+- `addToWhitelist(pattern)` in browser vs `addToWhitelist(pattern, confidence?)` in Node
+Reason: dependency removal (learning-confidence integration is disabled without learning store persistence).
+- `recordFalsePositive()`, `recordFalseNegative()`, `importLearnings()`, `exportLearnings()`
+Reason: dependency removal (LocalLearningStore persistence and learning workflows are disabled in browser).
+- `exportConfig()`, `detectDocument()`, `detectDocumentFile()`, `OpenRedaction.detectBatch()`, `OpenRedaction.detectDocumentsBatch()`
+Reason: environment constraint and dependency removal (filesystem/document parsing/worker-thread features are Node-only).
+
 ## Browser-only option constraints
 
 - Constructor rejects:
   `configPath`, `enableLearning: true`, `enablePriorityOptimization: true`
 - These are removed/ignored in browser-safe option normalization:
   `learningStorePath`, `optimizerOptions`
+
+### Options accepted by type but effectively inactive in browser
+
+The browser options type extends core/node option shapes for compatibility, so some flags are accepted but do not activate equivalent runtime features in browser:
+
+- Audit options: `enableAuditLog`, `auditLogger`, `auditUser`, `auditSessionId`, `auditMetadata`
+Reason: dependency removal (audit module exports and browser class audit methods are excluded).
+- Metrics options: `enableMetrics`, `metricsCollector`
+Reason: dependency removal (metrics module exports and browser class metrics methods are excluded).
+- RBAC options: `enableRBAC`, `rbacManager`, `role`
+Reason: dependency removal and environment scope reduction (RBAC manager API is not exposed in browser class).
 
 ## Why these are excluded
 
