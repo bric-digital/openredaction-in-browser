@@ -1,33 +1,14 @@
 {
   "name": "openredaction-in-browser",
   "version": "1.0.6",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "type": "module",
+  "main": "./dist/index.browser.mjs",
+  "module": "./dist/index.browser.mjs",
+  "types": "./dist/index.browser.d.mts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "browser": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.browser.mjs"
-      }
-    },
-    "./react": {
-      "import": {
-        "types": "./dist/react.d.mts",
-        "default": "./dist/react.mjs"
-      },
-      "require": {
-        "types": "./dist/react.d.ts",
-        "default": "./dist/react.js"
-      }
+      "types": "./dist/index.browser.d.mts",
+      "default": "./dist/index.browser.mjs"
     }
   },
   "files": [
