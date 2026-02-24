@@ -76,6 +76,7 @@ export OPENREDACTION_AI_ENDPOINT=https://your-api.example.com
 - **Regex is primary**: AI only adds additional entities; regex detections always take precedence
 - **No breaking changes**: When AI is disabled, behavior is identical to previous versions
 - **Browser support**: In browsers, you must provide an explicit `ai.endpoint` (env vars not available)
+- **Browser limitations**: See `../../docs/browser-excluded-features.md` for unsupported APIs/features in browser builds
 - **Network dependency**: AI mode requires network access to the endpoint
 
 ### For Sensitive Workloads

@@ -12,15 +12,13 @@ import {
   IRBACManager,
   PresetName
 } from './types';
-import { InMemoryAuditLogger } from './audit';
+import { InMemoryAuditLogger } from './audit/AuditLogger.js';
 import { InMemoryMetricsCollector } from './metrics';
 import { RBACManager, getPredefinedRole } from './rbac';
 import { allPatterns, getPatternsByCategory } from './patterns';
 import { generateDeterministicId } from './utils/hash';
 import { getPreset } from './utils/presets';
 import { applyRedactionMode } from './utils/redaction-strategies';
-import { LocalLearningStore } from './learning/LocalLearningStore.js';
-import { ConfigLoader } from './config/ConfigLoader.js';
 import { analyzeFullContext } from './context/ContextAnalyzer.js';
 import { isFalsePositive } from './filters/FalsePositiveFilter.js';
 import { createSimpleMultiPass, groupPatternsByPass, mergePassDetections, type DetectionPass } from './multipass/MultiPassDetector.js';
@@ -31,20 +29,48 @@ import type { PIIMatch } from './types';
 import { LRUCache, hashString } from './utils/cache.js';
 import { ExplainAPI, createExplainAPI } from './explain/ExplainAPI.js';
 import { createReportGenerator, type ReportOptions } from './reports/ReportGenerator.js';
-import { PriorityOptimizer, createPriorityOptimizer, type OptimizerOptions } from './optimizer/PriorityOptimizer.js';
 import {
   createLearningDisabledError,
   createOptimizationDisabledError
 } from './errors/OpenRedactionError.js';
 import { safeExec, validatePattern, RegexTimeoutError } from './utils/safe-regex.js';
 import { getAIEndpoint, callAIDetect, mergeAIEntities } from './utils/ai-assist.js';
+import { CoreDetector } from './core/CoreDetector.js';
 
 /**
  * Main OpenRedaction class for detecting and redacting PII
  */
 import type { RedactionMode } from './types';
 
+interface OptimizerOptions {
+  learningWeight: number;
+  minSampleSize: number;
+  maxPriorityAdjustment: number;
+}
+
+interface LocalLearningStoreLike {
+  getWhitelist(): string[];
+  getConfidence(pattern: string): number;
+  recordFalsePositive(text: string, type: string, context: string): void;
+  recordFalseNegative(text: string, type: string, context: string): void;
+  recordCorrectDetection(): void;
+  getStats(): unknown;
+  getWhitelistEntries(): unknown[];
+  getPatternAdjustments(): unknown[];
+  export(options?: { includeContexts?: boolean; minConfidence?: number }): unknown;
+  import(data: unknown, merge?: boolean): void;
+  addToWhitelist(pattern: string, confidence?: number): void;
+  removeFromWhitelist(pattern: string): void;
+  getAllPatternAdjustments(): unknown[];
+}
+
+interface PriorityOptimizerLike {
+  optimizePatterns(patterns: PIIPattern[]): PIIPattern[];
+  getPatternStats(patterns: PIIPattern[]): unknown;
+}
+
 export class OpenRedaction {
+  private coreDetector: CoreDetector;
   private patterns: PIIPattern[];
   private compiledPatterns: Map<PIIPattern, RegExp> = new Map(); // Pre-compiled regex cache
   private options: {
@@ -78,8 +104,9 @@ export class OpenRedaction {
   private resultCache?: LRUCache<string, DetectionResult>;
   private valueToPlaceholder: Map<string, string> = new Map();
   private placeholderCounter: Map<string, number> = new Map();
-  private learningStore?: LocalLearningStore;
-  private priorityOptimizer?: PriorityOptimizer;
+  private learningStore?: LocalLearningStoreLike;
+  private priorityOptimizer?: PriorityOptimizerLike;
+  private nodeOnlyInitPromise: Promise<void>;
   private enableLearning: boolean;
   private auditLogger?: IAuditLogger;
   private auditUser?: string;
@@ -159,27 +186,6 @@ export class OpenRedaction {
     // Enable learning by default
     this.enableLearning = options.enableLearning ?? true;
 
-    // Initialize learning store if enabled
-    if (this.enableLearning) {
-      const learningPath = options.learningStorePath || '.openredaction/learnings.json';
-      this.learningStore = new LocalLearningStore(learningPath, {
-        autoSave: true,
-        confidenceThreshold: 0.85
-      });
-
-      // Merge learned whitelist with user whitelist
-      const learnedWhitelist = this.learningStore.getWhitelist();
-      this.options.whitelist = [...this.options.whitelist, ...learnedWhitelist];
-
-      // Initialize priority optimizer if enabled
-      if (this.options.enablePriorityOptimization) {
-        this.priorityOptimizer = createPriorityOptimizer(
-          this.learningStore,
-          this.options.optimizerOptions
-        );
-      }
-    }
-
     // Build pattern list
     this.patterns = this.buildPatternList();
 
@@ -188,11 +194,6 @@ export class OpenRedaction {
 
     // Pre-compile all regex patterns for performance
     this.precompilePatterns();
-
-    // Apply priority optimization if enabled
-    if (this.priorityOptimizer) {
-      this.patterns = this.priorityOptimizer.optimizePatterns(this.patterns);
-    }
 
     // Initialize severity classifier (always enabled)
     this.severityClassifier = new SeverityClassifier();
@@ -247,12 +248,56 @@ export class OpenRedaction {
       // Enabled by default for better accuracy
       this.contextRulesEngine = new ContextRulesEngine(options.contextRulesConfig);
     }
+
+    this.coreDetector = new CoreDetector({
+      ...this.options,
+      enableNER: options.enableNER,
+      enableContextRules: options.enableContextRules,
+      contextRulesConfig: options.contextRulesConfig,
+      maxInputSize: options.maxInputSize,
+      regexTimeout: options.regexTimeout
+    });
+    this.coreDetector.setPatterns(this.patterns);
+    this.coreDetector.setWhitelist(this.options.whitelist);
+    this.nodeOnlyInitPromise = this.initializeNodeOnlyFeatures(options.learningStorePath);
+  }
+
+  private async initializeNodeOnlyFeatures(learningStorePath?: string): Promise<void> {
+    if (!this.enableLearning) {
+      return;
+    }
+
+    const { LocalLearningStore } = await import('./learning/LocalLearningStore.js');
+    this.learningStore = new LocalLearningStore(
+      learningStorePath || '.openredaction/learnings.json',
+      {
+        autoSave: true,
+        confidenceThreshold: 0.85
+      }
+    ) as LocalLearningStoreLike;
+
+    const learnedWhitelist = this.learningStore.getWhitelist();
+    this.options.whitelist = [...this.options.whitelist, ...learnedWhitelist];
+    this.coreDetector.setWhitelist(this.options.whitelist);
+
+    if (this.options.enablePriorityOptimization) {
+      const { createPriorityOptimizer } = await import('./optimizer/PriorityOptimizer.js');
+      this.priorityOptimizer = createPriorityOptimizer(
+        this.learningStore as never,
+        this.options.optimizerOptions
+      ) as PriorityOptimizerLike;
+
+      this.patterns = this.priorityOptimizer.optimizePatterns(this.patterns);
+      this.patterns.sort((a, b) => b.priority - a.priority);
+      this.coreDetector.setPatterns(this.patterns);
+    }
   }
 
   /**
    * Create OpenRedaction instance from config file
    */
   static async fromConfig(configPath?: string): Promise<OpenRedaction> {
+    const { ConfigLoader } = await import('./config/ConfigLoader.js');
     const loader = new ConfigLoader(configPath);
     const config = await loader.load();
 
@@ -604,174 +649,26 @@ export class OpenRedaction {
    * Now async to support optional AI assist
    */
   async detect(text: string): Promise<DetectionResult> {
+    await this.nodeOnlyInitPromise;
+
     // Check RBAC permission
     if (this.rbacManager && !this.rbacManager.hasPermission('detection:detect')) {
       throw new Error('[OpenRedaction] Permission denied: detection:detect required');
     }
 
-    const startTime = performance.now();
-
-    // Enforce input size limit (security critical)
-    const textSize = new Blob([text]).size;
-    if (textSize > this.options.maxInputSize) {
-      throw new Error(
-        `[OpenRedaction] Input size (${textSize} bytes) exceeds maximum allowed size (${this.options.maxInputSize} bytes). ` +
-        `Set maxInputSize option to increase limit or use streaming/batch processing for large documents.`
-      );
-    }
-
-    // Warn about large documents approaching the limit
-    if (textSize > this.options.maxInputSize * 0.8 && this.options.debug) {
-      console.warn(
-        `[OpenRedaction] Input size (${textSize} bytes) is approaching maximum limit (${this.options.maxInputSize} bytes)`
-      );
-    }
-
-    if (this.options.debug) {
-      console.log(`[OpenRedaction] Detecting PII in ${textSize} byte text`);
-      console.log(`[OpenRedaction] Active patterns: ${this.patterns.length}`);
-      console.log(`[OpenRedaction] Multi-pass: ${this.options.enableMultiPass ? 'enabled' : 'disabled'}`);
-      console.log(`[OpenRedaction] Cache: ${this.options.enableCache ? 'enabled' : 'disabled'}`);
-    }
-
-    // Check cache if enabled
-    if (this.resultCache) {
-      const cacheKey = hashString(text);
-      const cached = this.resultCache.get(cacheKey);
-      if (cached) {
-        if (this.options.debug) {
-          console.log('[OpenRedaction] Cache hit, returning cached result');
-        }
-        return cached;
-      }
-    }
-
-    // Reset counters for this detection run if not deterministic
-    if (!this.options.deterministic) {
-      this.placeholderCounter.clear();
-      this.valueToPlaceholder.clear();
-    }
-
-    let detections: PIIDetection[];
-    const processedRanges: Array<[number, number]> = [];
-
-    // Use multi-pass detection if enabled
-    if (this.options.enableMultiPass && this.multiPassConfig) {
-      // Group patterns by pass
-      const patternGroups = groupPatternsByPass(this.patterns, this.multiPassConfig);
-      const passDetections = new Map<string, PIIDetection[]>();
-
-      // Process each pass in order
-      for (const pass of this.multiPassConfig) {
-        const passPatterns = patternGroups.get(pass.name) || [];
-        if (passPatterns.length === 0) continue;
-
-        // Process this pass
-        const currentDetections = this.processPatterns(text, passPatterns, processedRanges);
-
-        // Store detections for this pass
-        passDetections.set(pass.name, currentDetections);
-
-        // Update processed ranges for next pass
-        for (const detection of currentDetections) {
-          processedRanges.push(detection.position);
-        }
-      }
-
-      // Merge detections from all passes
-      detections = mergePassDetections(passDetections, this.multiPassConfig);
-    } else {
-      // Single-pass detection (original behavior)
-      detections = this.processPatterns(text, this.patterns, processedRanges);
-    }
-
-    // AI Assist: Call AI endpoint if enabled
-    if (this.options.ai?.enabled) {
-      const aiEndpoint = getAIEndpoint(this.options.ai);
-      if (aiEndpoint) {
-        try {
-          if (this.options.debug) {
-            console.log('[OpenRedaction] AI assist enabled, calling AI endpoint...');
-          }
-          
-          const aiEntities = await callAIDetect(text, aiEndpoint, this.options.debug);
-          
-          if (aiEntities && aiEntities.length > 0) {
-            if (this.options.debug) {
-              console.log(`[OpenRedaction] AI returned ${aiEntities.length} additional entities`);
-            }
-            
-            // Merge AI entities with regex detections (regex takes precedence on conflicts)
-            detections = mergeAIEntities(detections, aiEntities, text);
-            
-            if (this.options.debug) {
-              console.log(`[OpenRedaction] After AI merge: ${detections.length} total detections`);
-            }
-          } else if (this.options.debug) {
-            console.log('[OpenRedaction] AI endpoint returned no additional entities');
-          }
-        } catch (error) {
-          // Silently fall back to regex-only - AI must never break core functionality
-          if (this.options.debug) {
-            console.warn(`[OpenRedaction] AI assist failed, using regex-only: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }
-      } else if (this.options.debug) {
-        console.warn('[OpenRedaction] AI assist enabled but no endpoint configured. Set ai.endpoint or OPENREDACTION_AI_ENDPOINT env var.');
-      }
-    }
-
-    // Sort detections by position (descending) for proper replacement
-    detections.sort((a, b) => b.position[0] - a.position[0]);
-
-    // Build redacted text and redaction map
-    let redacted = text;
-    const redactionMap: Record<string, string> = {};
-
-    for (const detection of detections) {
-      if (!detection.value) continue;
-
-      const escapedValue = this.escapeRegex(detection.value);
-      const pattern = new RegExp(escapedValue, 'gi');
-      redacted = redacted.replace(pattern, detection.placeholder);
-
-      redactionMap[detection.placeholder] = detection.value;
-    }
-
-    const endTime = performance.now();
-    const processingTime = Math.round((endTime - startTime) * 100) / 100;
-
-    const result: DetectionResult = {
-      original: text,
-      redacted,
-      detections: detections.reverse(), // Return in original order
-      redactionMap,
-      stats: {
-        processingTime,
-        piiCount: detections.length
-      }
-    };
-
-    if (this.options.debug) {
-      console.log(`[OpenRedaction] Detection complete: ${detections.length} PII found in ${processingTime}ms`);
-      if (detections.length > 0) {
-        const typeCounts: Record<string, number> = {};
-        for (const detection of detections) {
-          typeCounts[detection.type] = (typeCounts[detection.type] || 0) + 1;
-        }
-        console.log(`[OpenRedaction] Detection breakdown:`, typeCounts);
-      }
-    }
+    const result = await this.coreDetector.detect(text);
+    const processingTime = result.stats?.processingTime ?? 0;
+    const piiCount = result.stats?.piiCount ?? result.detections.length;
 
     // Log audit entry if enabled
     if (this.auditLogger) {
       try {
-        const piiTypes = [...new Set(detections.map(d => d.type))];
+        const piiTypes = [...new Set(result.detections.map(d => d.type))];
         this.auditLogger.log({
           operation: 'redact',
-          piiCount: detections.length,
+          piiCount,
           piiTypes,
-          textLength: text.length,
+          textLength: result.original.length,
           processingTimeMs: processingTime,
           redactionMode: this.options.redactionMode,
           success: true,
@@ -800,14 +697,6 @@ export class OpenRedaction {
     }
 
     // Store in cache if enabled
-    if (this.resultCache) {
-      const cacheKey = hashString(text);
-      this.resultCache.set(cacheKey, result);
-      if (this.options.debug) {
-        console.log('[OpenRedaction] Result cached');
-      }
-    }
-
     return result;
   }
 
@@ -821,11 +710,7 @@ export class OpenRedaction {
     }
 
     const startTime = performance.now();
-    let restored = redactedText;
-
-    for (const [placeholder, value] of Object.entries(redactionMap)) {
-      restored = restored.replace(new RegExp(this.escapeRegex(placeholder), 'g'), value);
-    }
+    const restored = this.coreDetector.restore(redactedText, redactionMap);
 
     const endTime = performance.now();
     const processingTime = Math.round((endTime - startTime) * 100) / 100;
@@ -924,7 +809,7 @@ export class OpenRedaction {
    * Get the list of active patterns
    */
   getPatterns(): PIIPattern[] {
-    return [...this.patterns];
+    return this.coreDetector.getPatterns();
   }
 
   /**
@@ -936,14 +821,7 @@ export class OpenRedaction {
     low: PIIDetection[];
     total: number;
   }> {
-    const result = await this.detect(text);
-
-    return {
-      high: result.detections.filter(d => d.severity === 'high'),
-      medium: result.detections.filter(d => d.severity === 'medium'),
-      low: result.detections.filter(d => d.severity === 'low'),
-      total: result.detections.length
-    };
+    return this.coreDetector.scan(text);
   }
 
   /**
@@ -960,6 +838,7 @@ export class OpenRedaction {
     // Update whitelist if confidence is high enough
     if (this.learningStore.getConfidence(detection.value) >= 0.85) {
       this.options.whitelist.push(detection.value);
+      this.coreDetector.setWhitelist(this.options.whitelist);
     }
   }
 
@@ -1046,6 +925,7 @@ export class OpenRedaction {
     // Update whitelist with newly learned patterns
     const learnedWhitelist = this.learningStore.getWhitelist();
     this.options.whitelist = [...new Set([...this.options.whitelist, ...learnedWhitelist])];
+    this.coreDetector.setWhitelist(this.options.whitelist);
   }
 
   /**
@@ -1054,11 +934,13 @@ export class OpenRedaction {
   addToWhitelist(pattern: string, confidence: number = 0.9): void {
     if (!this.learningStore) {
       this.options.whitelist.push(pattern);
+      this.coreDetector.setWhitelist(this.options.whitelist);
       return;
     }
 
     this.learningStore.addToWhitelist(pattern, confidence);
     this.options.whitelist.push(pattern);
+    this.coreDetector.setWhitelist(this.options.whitelist);
   }
 
   /**
@@ -1070,6 +952,7 @@ export class OpenRedaction {
     }
 
     this.options.whitelist = this.options.whitelist.filter(w => w !== pattern);
+    this.coreDetector.setWhitelist(this.options.whitelist);
   }
 
   /**
@@ -1096,15 +979,11 @@ export class OpenRedaction {
     }
 
     // Re-optimize patterns
-    this.patterns = this.priorityOptimizer.optimizePatterns(this.patterns);
+    this.patterns = this.priorityOptimizer.optimizePatterns(this.coreDetector.getPatterns());
 
     // Re-sort by new priorities
     this.patterns.sort((a, b) => b.priority - a.priority);
-
-    // Clear cache if enabled (priorities changed, cached results may be invalid)
-    if (this.resultCache) {
-      this.resultCache.clear();
-    }
+    this.coreDetector.setPatterns(this.patterns);
   }
 
   /**
@@ -1115,27 +994,21 @@ export class OpenRedaction {
       return null;
     }
 
-    return this.priorityOptimizer.getPatternStats(this.patterns);
+    return this.priorityOptimizer.getPatternStats(this.coreDetector.getPatterns());
   }
 
   /**
    * Clear the result cache (if caching is enabled)
    */
   clearCache(): void {
-    if (this.resultCache) {
-      this.resultCache.clear();
-    }
+    this.coreDetector.clearCache();
   }
 
   /**
    * Get cache statistics
    */
   getCacheStats(): { size: number; maxSize: number; enabled: boolean } {
-    return {
-      size: this.resultCache?.size || 0,
-      maxSize: this.options.cacheSize,
-      enabled: this.options.enableCache
-    };
+    return this.coreDetector.getCacheStats();
   }
 
   /**

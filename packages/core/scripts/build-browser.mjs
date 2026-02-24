@@ -1,46 +1,45 @@
-import { build } from "esbuild";
-import { resolve } from "path";
-import { fileURLToPath } from "url";
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const root = resolve(new URL(".", import.meta.url).pathname, ".."); // scripts/.. => package root
+const entry = resolve(root, "src/index.browser.ts");
+const outFile = resolve(root, "dist/index.browser.mjs");
 
-const entry = resolve(__dirname, "../src/index.browser.ts");
-const outfile = resolve(__dirname, "../dist/index.browser.mjs");
-
-async function run() {
-  try {
-    await build({
-      entryPoints: [entry],
-      outfile,
-      bundle: true,
-      format: "esm",
-      platform: "browser",
-      target: ["es2020"],
-      sourcemap: true,
-      minify: false,
-
-      // This is important — we want to FAIL if Node builtins are pulled in
-      external: [
-        "fs",
-        "path",
-        "os",
-        "crypto",
-        "worker_threads",
-        "node:module",
-        "node:fs",
-        "node:path",
-        "node:crypto",
-      ],
-
-      logLevel: "info",
-    });
-
-    console.log("✅ Browser build complete:", outfile);
-  } catch (err) {
-    console.error("❌ Browser build failed");
-    console.error(err);
-    process.exit(1);
-  }
+if (!existsSync(entry)) {
+  console.error("❌ Missing browser entry:", entry);
+  process.exit(1);
 }
 
-run();
+try {
+  // Build ONLY the browser entry with tsdown.
+  // tsdown CLI supports entry files as args.
+  execSync(`../../node_modules/.bin/tsdown ${entry} --format esm --outDir dist`, {
+    stdio: "inherit",
+    cwd: root,
+  });
+} catch (e) {
+  console.error("❌ tsdown browser build failed");
+  process.exit(1);
+}
+
+// tsdown will likely emit dist/index.browser.mjs automatically if the entry file is index.browser.ts.
+// If it emits dist/index.browser.js instead, we’ll rename it to .mjs to match exports.
+const emittedJs = resolve(root, "dist/index.browser.js");
+const emittedMjs = resolve(root, "dist/index.browser.mjs");
+
+if (existsSync(emittedJs) && !existsSync(emittedMjs)) {
+  // Rename to match export map
+  execSync(`node -e "require('fs').renameSync('dist/index.browser.js','dist/index.browser.mjs')"`, {
+    stdio: "inherit",
+    cwd: root,
+  });
+}
+
+if (!existsSync(outFile)) {
+  console.error("❌ Expected dist/index.browser.mjs but did not find it.");
+  console.error("   Check what tsdown emitted in dist/ and adjust build-browser.mjs accordingly.");
+  process.exit(1);
+}
+
+console.log("✅ Browser build created:", outFile);
