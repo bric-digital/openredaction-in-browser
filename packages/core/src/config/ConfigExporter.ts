@@ -3,52 +3,13 @@
  * Share configurations between projects and version control
  */
 
-import type { OpenRedactionOptions, PIIPattern } from '../types';
+import type { OpenRedactionOptions } from '../types';
+import { ConfigCodec } from './ConfigCodec';
+import type { ExportedConfig } from './ConfigCodec';
 
-export interface ExportedConfig {
-  version: string; // Config version for compatibility
-  timestamp: string; // When exported
-  options: {
-    includeNames?: boolean;
-    includeAddresses?: boolean;
-    includePhones?: boolean;
-    includeEmails?: boolean;
-    patterns?: string[];
-    categories?: string[];
-    whitelist?: string[];
-    deterministic?: boolean;
-    redactionMode?: string;
-    preset?: string;
-    enableContextAnalysis?: boolean;
-    confidenceThreshold?: number;
-    enableFalsePositiveFilter?: boolean;
-    falsePositiveThreshold?: number;
-    enableMultiPass?: boolean;
-    multiPassCount?: number;
-    enableCache?: boolean;
-    cacheSize?: number;
-    maxInputSize?: number;
-    regexTimeout?: number;
-  };
-  customPatterns?: Array<{
-    type: string;
-    regex: string;
-    flags: string;
-    priority: number;
-    placeholder: string;
-    description?: string;
-    severity?: string;
-  }>;
-  metadata?: {
-    description?: string;
-    author?: string;
-    tags?: string[];
-  };
-}
+export type { ExportedConfig } from './ConfigCodec';
 
 export class ConfigExporter {
-  private static readonly CONFIG_VERSION = '1.0';
-
   /**
    * Export configuration to JSON
    */
@@ -63,50 +24,8 @@ export class ConfigExporter {
       author?: string;
       tags?: string[];
     }
-  ): ExportedConfig {
-    const exported: ExportedConfig = {
-      version: this.CONFIG_VERSION,
-      timestamp: new Date().toISOString(),
-      options: {
-        includeNames: options.includeNames,
-        includeAddresses: options.includeAddresses,
-        includePhones: options.includePhones,
-        includeEmails: options.includeEmails,
-        patterns: options.patterns,
-        categories: options.categories,
-        whitelist: options.whitelist,
-        deterministic: options.deterministic,
-        redactionMode: options.redactionMode,
-        preset: options.preset,
-        enableContextAnalysis: options.enableContextAnalysis,
-        confidenceThreshold: options.confidenceThreshold,
-        enableFalsePositiveFilter: options.enableFalsePositiveFilter,
-        falsePositiveThreshold: options.falsePositiveThreshold,
-        enableMultiPass: options.enableMultiPass,
-        multiPassCount: options.multiPassCount,
-        enableCache: options.enableCache,
-        cacheSize: options.cacheSize,
-        maxInputSize: options.maxInputSize,
-        regexTimeout: options.regexTimeout
-      },
-      metadata
-    };
-
-    // Export custom patterns if present
-    if (options.customPatterns && options.customPatterns.length > 0) {
-      exported.customPatterns = options.customPatterns.map(p => ({
-        type: p.type,
-        regex: p.regex.source,
-        flags: p.regex.flags,
-        priority: p.priority,
-        placeholder: p.placeholder,
-        description: p.description,
-        severity: p.severity
-      }));
-    }
-
-    // Remove undefined values for cleaner JSON
-    return JSON.parse(JSON.stringify(exported));
+  ) {
+    return ConfigCodec.exportConfig(options, metadata);
   }
 
   /**
@@ -118,36 +37,8 @@ export class ConfigExporter {
       mergeWithDefaults?: boolean;
       validatePatterns?: boolean;
     }
-  ): OpenRedactionOptions & {
-    categories?: string[];
-    maxInputSize?: number;
-    regexTimeout?: number;
-  } {
-    // Validate version compatibility
-    if (!exported.version || exported.version !== this.CONFIG_VERSION) {
-      console.warn(
-        `[OpenRedaction] Config version mismatch. Expected ${this.CONFIG_VERSION}, got ${exported.version}`
-      );
-    }
-
-    const config: any = { ...exported.options };
-
-    // Reconstruct custom patterns
-    if (exported.customPatterns) {
-      config.customPatterns = exported.customPatterns.map(p => {
-        const pattern: PIIPattern = {
-          type: p.type,
-          regex: new RegExp(p.regex, p.flags),
-          priority: p.priority,
-          placeholder: p.placeholder,
-          description: p.description,
-          severity: p.severity as any
-        };
-        return pattern;
-      });
-    }
-
-    return config;
+  ) {
+    return ConfigCodec.importConfig(exported, _options);
   }
 
   /**
@@ -166,8 +57,7 @@ export class ConfigExporter {
     },
     pretty?: boolean
   ): string {
-    const exported = this.exportConfig(options, metadata);
-    return JSON.stringify(exported, null, pretty ? 2 : undefined);
+    return ConfigCodec.exportToString(options, metadata, pretty);
   }
 
   /**
@@ -178,8 +68,7 @@ export class ConfigExporter {
     maxInputSize?: number;
     regexTimeout?: number;
   } {
-    const exported: ExportedConfig = JSON.parse(json);
-    return this.importConfig(exported);
+    return ConfigCodec.importFromString(json);
   }
 
   /**
@@ -219,75 +108,21 @@ export class ConfigExporter {
   /**
    * Validate exported config structure
    */
-  static validateConfig(exported: ExportedConfig): {
+  static validateConfig(exported: import('./ConfigCodec').ExportedConfig): {
     valid: boolean;
     errors: string[];
   } {
-    const errors: string[] = [];
-
-    if (!exported.version) {
-      errors.push('Missing version field');
-    }
-
-    if (!exported.timestamp) {
-      errors.push('Missing timestamp field');
-    }
-
-    if (!exported.options) {
-      errors.push('Missing options field');
-    }
-
-    // Validate custom patterns if present
-    if (exported.customPatterns) {
-      for (const pattern of exported.customPatterns) {
-        if (!pattern.type || !pattern.regex || !pattern.placeholder) {
-          errors.push(`Invalid custom pattern: ${pattern.type}`);
-        }
-        // Try to compile the regex
-        try {
-          new RegExp(pattern.regex, pattern.flags);
-        } catch (e) {
-          errors.push(`Invalid regex in pattern ${pattern.type}: ${(e as Error).message}`);
-        }
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors
-    };
+    return ConfigCodec.validateConfig(exported);
   }
 
   /**
    * Merge two configurations (useful for extending base configs)
    */
   static mergeConfigs(
-    base: ExportedConfig,
-    override: ExportedConfig
-  ): ExportedConfig {
-    return {
-      version: this.CONFIG_VERSION,
-      timestamp: new Date().toISOString(),
-      options: {
-        ...base.options,
-        ...override.options,
-        // Special handling for arrays
-        patterns: override.options.patterns || base.options.patterns,
-        categories: override.options.categories || base.options.categories,
-        whitelist: [
-          ...(base.options.whitelist || []),
-          ...(override.options.whitelist || [])
-        ]
-      },
-      customPatterns: [
-        ...(base.customPatterns || []),
-        ...(override.customPatterns || [])
-      ],
-      metadata: {
-        ...base.metadata,
-        ...override.metadata
-      }
-    };
+    base: import('./ConfigCodec').ExportedConfig,
+    override: import('./ConfigCodec').ExportedConfig
+  ): import('./ConfigCodec').ExportedConfig {
+    return ConfigCodec.mergeConfigs(base, override);
   }
 }
 

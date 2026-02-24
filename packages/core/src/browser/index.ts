@@ -2,6 +2,8 @@ export { OpenRedaction } from './OpenRedaction.js';
 export type { BrowserOpenRedactionOptions } from './OpenRedaction.js';
 export { createBrowserRedactor } from './createBrowserRedactor.js';
 export type { BrowserRedactor } from './createBrowserRedactor.js';
+export { ConfigCodec } from '../config/ConfigCodec.js';
+export type { ExportedConfig } from '../config/ConfigCodec.js';
 
 export type {
   PIIPattern,

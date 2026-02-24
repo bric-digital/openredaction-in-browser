@@ -360,6 +360,7 @@ export type {
 } from './api';
 
 // Configuration Import/Export (Phase 3)
+export { ConfigCodec } from './config/ConfigCodec';
 export {
   ConfigExporter,
   createConfigPreset,

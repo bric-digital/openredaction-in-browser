@@ -6,6 +6,7 @@ This file documents all functionality currently unavailable from the browser bun
 
 - Core PII detection/redaction via browser `OpenRedaction` and `createBrowserRedactor`
 - Full built-in pattern/rule set used by `CoreDetector`
+- Config JSON encode/decode via `ConfigCodec` (`exportConfig`, `importConfig`, `exportToString`, `importFromString`, validation/merge helpers)
 - Core types (`DetectionResult`, `PIIDetection`, `RedactionMode`, `OpenRedactionOptions`, etc.)
 - Validators, presets, context analysis/rules, severity tools, false-positive helpers, multipass helpers, safe-regex helpers, AI assist helpers
 
@@ -22,7 +23,8 @@ This file documents all functionality currently unavailable from the browser bun
 - Document processing module:
   `DocumentProcessor`, `OCRProcessor`, `JsonProcessor`, `CsvProcessor`, `XlsxProcessor`, and related document types
 - Learning/config persistence module exports:
-  `LocalLearningStore`, `ConfigLoader`, `ConfigExporter`, `createConfigPreset`, `exportForVersionControl`, `ExportedConfig`
+  `LocalLearningStore`, `ConfigLoader`, `ConfigExporter`, `createConfigPreset`, `exportForVersionControl`
+  Note: `ConfigCodec` and `ExportedConfig` are browser-safe and exported in browser entry.
 - NER module:
   `NERDetector`, `createNERDetector`, and NER types
 - Priority optimization module:

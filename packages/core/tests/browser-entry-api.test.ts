@@ -37,4 +37,11 @@ describe('browser entry API', () => {
     expect('NERDetector' in BrowserAPI).toBe(false);
     expect('createNERDetector' in BrowserAPI).toBe(false);
   });
+
+  it('exposes ConfigCodec for browser-safe config JSON parsing', () => {
+    expect('ConfigCodec' in BrowserAPI).toBe(true);
+    const json = BrowserAPI.ConfigCodec.exportToString({ maxInputSize: 1234 });
+    const options = BrowserAPI.ConfigCodec.importFromString(json);
+    expect(options.maxInputSize).toBe(1234);
+  });
 });
