@@ -4,10 +4,10 @@
   "type": "module",
   "main": "./dist/index.browser.mjs",
   "module": "./dist/index.browser.mjs",
-  "types": "./dist/index.browser.d.mts",
+  "types": "./dist/index.browser.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.browser.d.mts",
+      "types": "./dist/index.browser.d.ts",
       "default": "./dist/index.browser.mjs"
     }
   },

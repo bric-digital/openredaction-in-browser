@@ -1,8 +1,9 @@
 import { CoreDetector } from '../core/CoreDetector.js';
-import type { DetectionResult, OpenRedactionOptions, PIIDetection, PIIPattern } from '../types.js';
+import type { CoreDetectorOptions } from '../core/CoreDetector.js';
+import type { DetectionResult, PIIDetection, PIIPattern } from '../types.js';
 import { createLearningDisabledError, createOptimizationDisabledError } from '../errors/OpenRedactionError.js';
 
-export type BrowserOpenRedactionOptions = OpenRedactionOptions & {
+export type BrowserOpenRedactionOptions = CoreDetectorOptions & {
   configPath?: string;
   enableLearning?: boolean;
   learningStorePath?: string;
@@ -40,7 +41,7 @@ export class OpenRedaction {
       enablePriorityOptimization: false
     };
 
-    const browserSafeOptions: OpenRedactionOptions = { ...this.options };
+    const browserSafeOptions: CoreDetectorOptions = { ...this.options };
     delete (browserSafeOptions as Record<string, unknown>).configPath;
     delete (browserSafeOptions as Record<string, unknown>).learningStorePath;
     delete (browserSafeOptions as Record<string, unknown>).enableLearning;

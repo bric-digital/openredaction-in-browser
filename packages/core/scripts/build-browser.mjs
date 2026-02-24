@@ -27,10 +27,20 @@ try {
 // If it emits dist/index.browser.js instead, we’ll rename it to .mjs to match exports.
 const emittedJs = resolve(root, "dist/index.browser.js");
 const emittedMjs = resolve(root, "dist/index.browser.mjs");
+const emittedDmts = resolve(root, "dist/index.browser.d.mts");
+const emittedDts = resolve(root, "dist/index.browser.d.ts");
 
 if (existsSync(emittedJs) && !existsSync(emittedMjs)) {
   // Rename to match export map
   execSync(`node -e "require('fs').renameSync('dist/index.browser.js','dist/index.browser.mjs')"`, {
+    stdio: "inherit",
+    cwd: root,
+  });
+}
+
+// Keep a .d.ts alias for broad TypeScript resolver compatibility in consumer builds.
+if (existsSync(emittedDmts)) {
+  execSync(`node -e "require('fs').copyFileSync('dist/index.browser.d.mts','dist/index.browser.d.ts')"`, {
     stdio: "inherit",
     cwd: root,
   });
