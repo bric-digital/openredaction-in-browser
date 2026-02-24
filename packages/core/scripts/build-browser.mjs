@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { copyFileSync, existsSync, renameSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(new URL(".", import.meta.url).pathname, ".."); // scripts/.. => package root
@@ -32,18 +32,12 @@ const emittedDts = resolve(root, "dist/index.browser.d.ts");
 
 if (existsSync(emittedJs) && !existsSync(emittedMjs)) {
   // Rename to match export map
-  execSync(`node -e "require('fs').renameSync('dist/index.browser.js','dist/index.browser.mjs')"`, {
-    stdio: "inherit",
-    cwd: root,
-  });
+  renameSync(emittedJs, emittedMjs);
 }
 
 // Keep a .d.ts alias for broad TypeScript resolver compatibility in consumer builds.
 if (existsSync(emittedDmts)) {
-  execSync(`node -e "require('fs').copyFileSync('dist/index.browser.d.mts','dist/index.browser.d.ts')"`, {
-    stdio: "inherit",
-    cwd: root,
-  });
+  copyFileSync(emittedDmts, emittedDts);
 }
 
 if (!existsSync(outFile)) {

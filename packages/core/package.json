@@ -15,8 +15,10 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsdown && node scripts/dual-types.js",
+    "build": "npm run build:browser",
     "build:browser": "node scripts/build-browser.mjs",
+    "build:node": "tsdown",
+    "build:all": "npm run build:browser && npm run build:node",
     "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
