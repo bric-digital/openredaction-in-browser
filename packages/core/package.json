@@ -13,6 +13,10 @@
       "require": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "browser": {
+        "types": "./dist/index.browser.mts",
+        "default": "./dist/index.browser.mjs"
       }
     },
     "./react": {
@@ -31,6 +35,7 @@
   ],
   "scripts": {
     "build": "tsdown && node scripts/dual-types.js",
+    "build:browser": "node scripts/build-browser.mjs",
     "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
