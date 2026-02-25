@@ -4,7 +4,7 @@ This file documents all functionality currently unavailable from the browser bun
 
 ## Browser-safe functionality that is available
 
-- Core PII detection/redaction via browser `OpenRedaction` and `createBrowserRedactor`
+- Core PII detection/redaction via browser `OpenRedaction`
 - Full built-in pattern/rule set used by `CoreDetector`
 - Config JSON encode/decode via `ConfigCodec` (`exportConfig`, `importConfig`, `exportToString`, `importFromString`, validation/merge helpers)
 - Core types (`DetectionResult`, `PIIDetection`, `RedactionMode`, `OpenRedactionOptions`, etc.)
