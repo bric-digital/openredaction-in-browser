@@ -1,6 +1,7 @@
 {
   "name": "openredaction-in-browser",
   "version": "1.0.6",
+  "description": "Browser-focused OpenRedaction package for local PII detection and redaction",
   "type": "module",
   "main": "./dist/index.browser.mjs",
   "module": "./dist/index.browser.mjs",
@@ -13,6 +14,25 @@
   },
   "files": [
     "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bric-digital/openredaction-in-browser.git"
+  },
+  "homepage": "https://github.com/bric-digital/openredaction-in-browser/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/bric-digital/openredaction-in-browser/issues"
+  },
+  "keywords": [
+    "openredaction-in-browser",
+    "browser",
+    "pii",
+    "redaction",
+    "privacy",
+    "gdpr",
+    "hipaa",
+    "data-protection",
+    "anonymization"
   ],
   "scripts": {
     "build": "npm run build:browser",

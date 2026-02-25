@@ -1,8 +1,8 @@
 {
-  "name": "openredaction",
+  "name": "openredaction-in-browser",
   "version": "0.1.1",
   "private": true,
-  "description": "Production-ready PII detection and redaction library",
+  "description": "Browser-focused OpenRedaction distribution for PII detection and redaction",
   "packageManager": "npm@10.0.0",
   "workspaces": [
     "packages/*"
@@ -23,16 +23,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sam247/redactit.git"
+    "url": "https://github.com/bric-digital/openredaction-in-browser.git"
+  },
+  "homepage": "https://github.com/bric-digital/openredaction-in-browser#readme",
+  "bugs": {
+    "url": "https://github.com/bric-digital/openredaction-in-browser/issues"
   },
   "keywords": [
+    "openredaction-in-browser",
+    "browser",
+    "extension",
     "pii",
     "redaction",
     "privacy",
     "gdpr",
     "hipaa",
     "data-protection",
-    "openredaction",
     "redact",
     "sensitive-data",
     "anonymization"

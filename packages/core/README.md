@@ -1,4 +1,4 @@
-# OpenRedaction
+# openredaction-in-browser
 
 Production-ready PII detection and redaction library with 571+ built-in patterns, multiple redaction modes, compliance presets, enterprise SaaS features, and zero dependencies.
 
@@ -36,7 +36,7 @@ import { useOpenRedaction, usePIIDetector } from 'openredaction-in-browser/react
 
 ## Optional AI Assist
 
-OpenRedaction supports an optional AI-assisted detection mode that enhances regex-based detection by calling a hosted AI endpoint. This feature is **OFF by default** and requires explicit configuration.
+openredaction-in-browser supports an optional AI-assisted detection mode that enhances regex-based detection by calling a hosted AI endpoint. This feature is **OFF by default** and requires explicit configuration.
 
 ### Configuration
 
@@ -93,7 +93,7 @@ const detector = new OpenRedaction({
 
 ## Documentation
 
-Full documentation available at [GitHub](https://github.com/sam247/openredaction)
+Full documentation available at [GitHub](https://github.com/bric-digital/openredaction-in-browser)
 
 ## Features
 

@@ -1,15 +1,15 @@
-# OpenRedaction
+# openredaction-in-browser
 
-[![Version](https://img.shields.io/badge/version-1.0.3-brightgreen.svg)](https://github.com/sam247/openredaction)
+[![Version](https://img.shields.io/badge/version-1.0.6-brightgreen.svg)](https://github.com/bric-digital/openredaction-in-browser)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/tests-450%20passing-brightgreen.svg)](https://github.com/sam247/openredaction)
+[![Tests](https://img.shields.io/badge/tests-vitest-brightgreen.svg)](https://github.com/bric-digital/openredaction-in-browser)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
 
-OpenRedaction is an open-source JavaScript/TypeScript library for detecting and redacting PII with a regex-first approach. It runs locally by default and can be combined with an optional hosted API for AI-assisted detection.
+`openredaction-in-browser` is a browser-focused distribution of OpenRedaction for detecting and redacting PII with a regex-first approach.
 
-## What is OpenRedaction?
+## What is openredaction-in-browser?
 
-OpenRedaction is a production-ready library that helps you keep sensitive data out of logs, prompts, and analytics pipelines. It combines 570+ curated regex patterns with advanced context-aware validation, checksum verification, and multiple redaction modes.
+`openredaction-in-browser` helps keep sensitive data out of logs, prompts, and analytics pipelines in browser runtimes. It includes 570+ curated regex patterns with context-aware validation, checksum verification, and multiple redaction modes.
 
 **Key principles:**
 - **Regex-first**: Pattern-based detection runs locally, fast, and private
@@ -21,7 +21,7 @@ OpenRedaction is a production-ready library that helps you keep sensitive data o
 ## Installation
 
 ```bash
-npm install openredaction
+npm install openredaction-in-browser
 ```
 
 ## Basic Usage (Regex-Only)
@@ -29,7 +29,7 @@ npm install openredaction
 The library works entirely with regex patterns by default. All detection happens locally in your application.
 
 ```typescript
-import { OpenRedaction } from 'openredaction';
+import { OpenRedaction } from 'openredaction-in-browser';
 
 const redactor = new OpenRedaction({
   redactionMode: 'placeholder'
@@ -47,7 +47,7 @@ console.log(result.detections);
 ### Simple Redaction Example
 
 ```typescript
-import { OpenRedaction } from 'openredaction';
+import { OpenRedaction } from 'openredaction-in-browser';
 
 const redactor = new OpenRedaction({
   includeNames: true,
@@ -66,7 +66,7 @@ console.log(redacted);
 ### Pre-processing for LLM Pipelines
 
 ```typescript
-import { OpenRedaction } from 'openredaction';
+import { OpenRedaction } from 'openredaction-in-browser';
 
 const redactor = new OpenRedaction({
   preset: 'gdpr',
@@ -178,11 +178,10 @@ const redactor = new OpenRedaction({
 
 ## Ecosystem
 
-OpenRedaction is part of a broader ecosystem:
+This repository tracks a browser-focused package build.
 
-- **openredaction** (this package) — Core library for local, regex-based PII detection and redaction
-- **[openredaction-api](https://github.com/sam247/openredaction-api)** — Optional hosted API that wraps this library and provides AI-assisted detection with API keys and rate limiting
-- **[openredaction-site](https://openredaction.com)** — Website and playground where you can try the library and hosted API in your browser
+- **openredaction-in-browser** (this package) — Browser-focused package for local, regex-based PII detection and redaction
+- **[OpenRedaction upstream](https://github.com/sam247/openredaction)** — Original upstream project
 
 ### Using the Hosted API (Optional)
 
@@ -251,8 +250,8 @@ We continuously improve our regex patterns and detection accuracy. Recent improv
 
 ## Community & Support
 
-- **Report bugs or request features**: Open a [GitHub issue](https://github.com/sam247/openredaction/issues) with details and reproduction steps
-- **Questions or discussions**: Use [GitHub Discussions](https://github.com/sam247/openredaction/discussions) or issues to talk through ideas
+- **Report bugs or request features**: Open a [GitHub issue](https://github.com/bric-digital/openredaction-in-browser/issues) with details and reproduction steps
+- **Questions or discussions**: Use [GitHub Discussions](https://github.com/bric-digital/openredaction-in-browser/discussions) or issues to talk through ideas
 - **Attribution**: Mention "OpenRedaction" and link to this repository in research or production use
 
 ## License
