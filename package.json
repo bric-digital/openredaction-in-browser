@@ -3,11 +3,28 @@
   "version": "0.1.1",
   "private": true,
   "description": "Browser-focused OpenRedaction distribution for PII detection and redaction",
+  "type": "module",
+  "main": "./packages/core/dist/index.browser.mjs",
+  "module": "./packages/core/dist/index.browser.mjs",
+  "types": "./packages/core/dist/index.browser.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/core/dist/index.browser.d.ts",
+      "default": "./packages/core/dist/index.browser.mjs"
+    }
+  },
+  "files": [
+    "packages/core/dist",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
   "packageManager": "npm@10.0.0",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
+    "prepare": "npm --prefix packages/core run build:browser",
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test",
@@ -16,6 +33,7 @@
   },
   "devDependencies": {
     "turbo": "^2.0.0",
+    "tsdown": "^0.20.1",
     "typescript": "^5.3.3"
   },
   "engines": {
