@@ -78,7 +78,7 @@ export const contactPatterns: PIIPattern[] = [
   {
     type: 'PHONE_US',
     regex: /\b(?:\+1[\s\u00A0.-]?)?(?:\(\d{3}\)|\d{3})[\s\u00A0.-]?\d{3}[\s\u00A0.-]?\d{4}(?:\s?(?:ext\.?|x)\s?\d{1,6})?\b/g,
-    priority: 85,
+    priority: 86,
     placeholder: '[PHONE_US_{n}]',
     description: 'US phone number',
     severity: 'medium',
