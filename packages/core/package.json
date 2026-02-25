@@ -39,6 +39,7 @@
     "build:browser": "node scripts/build-browser.mjs",
     "build:node": "tsdown",
     "build:all": "npm run build:browser && npm run build:node",
+    "prepare": "npm run build:browser",
     "dev": "tsdown --watch",
     "test": "vitest run",
     "test:watch": "vitest",
